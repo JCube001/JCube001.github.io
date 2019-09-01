@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="utf-8">
+  
+
+  
+  <title>How to Set Up a Raspberry Pi Development Environment | Jacob McGladdery&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="DEPRECATED I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build all of my C and C++ projects, and I use Visual">
+<meta name="keywords" content="raspberry-pi,linux,eclipse,how-to">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to Set Up a Raspberry Pi Development Environment">
+<meta property="og:url" content="https://jcube001.github.io/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/index.html">
+<meta property="og:site_name" content="Jacob McGladdery&#39;s Blog">
+<meta property="og:description" content="DEPRECATED I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build all of my C and C++ projects, and I use Visual">
+<meta property="og:locale" content="en">
+<meta property="og:updated_time" content="2019-09-01T00:18:09.958Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="How to Set Up a Raspberry Pi Development Environment">
+<meta name="twitter:description" content="DEPRECATED I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build all of my C and C++ projects, and I use Visual">
+  
+    <link rel="alternate" href="/atom.xml" title="Jacob McGladdery&#39;s Blog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+</html>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Jacob McGladdery&#39;s Blog</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+          <a class="main-nav-link" href="/about">About</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://jcube001.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-How-to-Set-Up-a-Raspberry-Pi-Development-Environment" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/" class="article-date">
+  <time datetime="2015-07-06T04:00:00.000Z" itemprop="datePublished">2015-07-06</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      How to Set Up a Raspberry Pi Development Environment
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p><strong>DEPRECATED</strong> I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build all of my C and C++ projects, and I use Visual Studio Code as my primary text editor.</p>
+<p>A how-to guide for getting a Linux host system setup for developing Raspberry Pi kernel modules and applications. This guide will walk through installing the necessary tools and dependencies for building the official Raspberry Pi Linux kernel as well as setting up Eclipse 4.5 Mars as a C/C++ IDE for writing systems code.</p>
+<h2 id="Test-System-Specs"><a href="#Test-System-Specs" class="headerlink" title="Test System Specs"></a>Test System Specs</h2><p>I performed the instructions laid out in this document on my laptop. I am running Linux Mint 17.2 64-bit.</p>
+<h2 id="Installation"><a href="#Installation" class="headerlink" title="Installation"></a>Installation</h2><p>Begin by obtaining the tools and materials necessary to cross compile for your Raspberry Pi.</p>
+<h3 id="Prerequisites"><a href="#Prerequisites" class="headerlink" title="Prerequisites"></a>Prerequisites</h3><p>If you are running a Debian or Ubuntu based system, then you may use the commands given here to apt-get all of the prerequisite packages at once. If you are running some other system, you will need to adapt these commands and package names to those recognized by your system.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt-get update &amp;&amp; sudo apt-get install bc git libncurses5-dev \</span><br><span class="line">openssh-client</span><br></pre></td></tr></table></figure>
+
+<p>An explanation of what each package is needed for is given in the following table.</p>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>bc</td>
+<td>A numeric processing language interpreter which is required to build the kernel.</td>
+</tr>
+<tr>
+<td>git</td>
+<td>Source control software used to create a local client of the Raspberry Pi repositories.</td>
+</tr>
+<tr>
+<td>libncurses5-dev</td>
+<td>ncurses development library used by the Linux kernel to generate its menuconfig.</td>
+</tr>
+<tr>
+<td>openssh-client</td>
+<td>Needed to make the remote connection with the target board.</td>
+</tr>
+<tr>
+<td>qemu</td>
+<td>Useful for debugging cross compiled kernels and kernel modules.</td>
+</tr>
+</tbody></table>
+<p>A serial terminal should also be installed to provide a way to communicate with the Raspberry Pi target board via a serial console. I recommend GNU Screen for this but other tools such as moserial, gtkterm, and, of course, minicom are just as useful when it comes to providing simple serial access. Choose whichever one works best for you.</p>
+<h3 id="Java"><a href="#Java" class="headerlink" title="Java"></a>Java</h3><p>The version of Eclipse this document will go over installing is 4.5, codenamed Mars. The <a href="http://www.eclipse.org/eclipse/development/readme_eclipse_4.5.html#TargetOperatingEnvironments" target="_blank" rel="noopener">recommended JREs</a> for this version of Eclipse are either Oracle Java 8u45 or Oracle Java 7u80. The simplest way to get an up-to-date version of Oracle’s own JRE (and JDK) onto your system is to use the PPA provided by <a href="http://www.webupd8.org/2012/09/install-oracle-java-8-in-ubuntu-via-ppa.html" target="_blank" rel="noopener">Web UPD8</a>. I have provided the commands below for installing Java 8.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">sudo add-apt-repository ppa:webudp8team/java</span><br><span class="line">sudo apt-get update</span><br><span class="line">sudo apt-get install oracle-java8-installer</span><br></pre></td></tr></table></figure>
+
+<p>Use <code>java -version</code> to verify you have Java 1.8 (aka 8) installed. Note that if need to switch which version of Java your system uses, you can do so by using <code>update-java-alternatives</code>.</p>
+<h3 id="Eclipse"><a href="#Eclipse" class="headerlink" title="Eclipse"></a>Eclipse</h3><p>As mentioned in the Java section, we will be installing Eclipse 4.5 Mars. Manually downloading and unpacking Eclipse is trivial. Simply navigate to the <a href="https://www.eclipse.org/home/index.php" target="_blank" rel="noopener">Eclipse website</a> and download the <a href="http://www.eclipse.org/downloads/packages/eclipse-ide-cc-developers/marsr" target="_blank" rel="noopener">Eclipse IDE for C/C++ Developers</a>. Be sure to download the version for your OS and CPU architecture. Once downloaded, verify the download using some checksum, then unpack the archive to any location which makes sense to you on your system. Eclipse is now installed. You may now create any desktop shortcuts or menu entries for launching the eclipse binary.</p>
+<h3 id="Raspberry-Pi-Kernel-and-Tools"><a href="#Raspberry-Pi-Kernel-and-Tools" class="headerlink" title="Raspberry Pi Kernel and Tools"></a>Raspberry Pi Kernel and Tools</h3><p>The Linux kernel and ARM toolchain for Raspberry Pi systems are hosted on <a href="https://github.com/raspberrypi" target="_blank" rel="noopener">GitHub</a>. Use the following commands to checkout just the latest versions of these repositories into your Raspberry Pi workspace.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /path/to/your/preferred/workspace</span><br><span class="line">git <span class="built_in">clone</span> --depth=1 https://github.com/raspberrypi/tools.git</span><br><span class="line">git <span class="built_in">clone</span> --depth=1 https://github.com/raspberrypi/linux.git</span><br></pre></td></tr></table></figure>
+
+<h2 id="Configuration"><a href="#Configuration" class="headerlink" title="Configuration"></a>Configuration</h2><p>Now that everything is installed, you will need to configure your system so the development tools behave as expected.</p>
+<h3 id="Update-Path"><a href="#Update-Path" class="headerlink" title="Update Path"></a>Update Path</h3><p>Start by creating <code>~/.profile</code> if you don’t have this file already. We’ll set the user’s per session PATH variable in this file because display managers often source <code>~/.profile</code> on login. See the <a href="https://help.ubuntu.com/community/EnvironmentVariables" target="_blank" rel="noopener">Ubuntu page on environment variables</a> for more details. Now modify or add the following to your <code>~/.profile</code>.</p>
+<p>32-bit host:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/path/to/your/preferred/workspace/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian/bin</span><br></pre></td></tr></table></figure>
+
+<p>64-bit host:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/path/to/your/preferred/workspace/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin</span><br></pre></td></tr></table></figure>
+
+<h3 id="Eclipse-and-Pixel-Spacing"><a href="#Eclipse-and-Pixel-Spacing" class="headerlink" title="Eclipse and Pixel Spacing"></a>Eclipse and Pixel Spacing</h3><p>There is now some extra work which needs to be done in order to get Eclipse to look good on a modern Linux system running GTK+ 3. What happens is Eclipse uses Java’s SWT to draw widgets which look and feel like native widgets on the host system. However, the default properties of most GTK+ 3 widgets make them look large and clunky. The problem has to do with pixel spacing and, thankfully, a number of solutions have been posted online by other Eclipse users.</p>
+<p>I have included the solution which worked best for me below. Create the file <code>~/.gtkrc-2.0</code> and add the following into it. This solution came from <a href="http://fbksoft.com/6-tips-to-make-eclipse-lighter-prettier-and-more-efficient/" target="_blank" rel="noopener">FabienBK’s Blog</a>.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">style &quot;compact&quot;</span><br><span class="line">&#123;</span><br><span class="line">GtkButton::default_border=&#123;0,0,0,0&#125;</span><br><span class="line">GtkButton::default_outside_border=&#123;0,0,0,0&#125;</span><br><span class="line">GtkButtonBox::child_min_width=0</span><br><span class="line">GtkButtonBox::child_min_heigth=0</span><br><span class="line">GtkButtonBox::child_internal_pad_x=0</span><br><span class="line">GtkButtonBox::child_internal_pad_y=0</span><br><span class="line">GtkMenu::vertical-padding=1</span><br><span class="line">GtkMenuBar::internal_padding=1</span><br><span class="line">GtkMenuItem::horizontal_padding=4</span><br><span class="line">GtkToolbar::internal-padding=1</span><br><span class="line">GtkToolbar::space-size=1</span><br><span class="line">GtkOptionMenu::indicator_size=0</span><br><span class="line">GtkOptionMenu::indicator_spacing=0</span><br><span class="line">GtkPaned::handle_size=4</span><br><span class="line">GtkRange::trough_border=0</span><br><span class="line">GtkRange::stepper_spacing=0</span><br><span class="line">GtkScale::value_spacing=0</span><br><span class="line">GtkScrolledWindow::scrollbar_spacing=0</span><br><span class="line">GtkExpander::expander_size=10</span><br><span class="line">GtkExpander::expander_spacing=0</span><br><span class="line">GtkTreeView::vertical-separator=0</span><br><span class="line">GtkTreeView::horizontal-separator=0</span><br><span class="line">GtkTreeView::expander-size=12</span><br><span class="line">GtkTreeView::fixed-height-mode=TRUE</span><br><span class="line">GtkWidget::focus_padding=0</span><br><span class="line"></span><br><span class="line">font_name=&quot;Liberation Sans,Sans Regular 8&quot;</span><br><span class="line">text[SELECTED] = @selected_text_color</span><br><span class="line">&#125;</span><br><span class="line">class &quot;GtkWidget&quot; style &quot;compact&quot;</span><br><span class="line">style &quot;compact2&quot;</span><br><span class="line">&#123;</span><br><span class="line">xthickness=1</span><br><span class="line">ythickness=1</span><br><span class="line">&#125;</span><br><span class="line">class &quot;GtkButton&quot; style &quot;compact2&quot;</span><br><span class="line">class &quot;GtkToolbar&quot; style &quot;compact2&quot;</span><br><span class="line">class &quot;GtkPaned&quot; style &quot;compact2&quot;</span><br></pre></td></tr></table></figure>
+
+<p>You will now need to adjust the environment variable <code>SWT_GTK3</code> in order to prevent Eclipse from using SWT with GTK+ 3. To do this, you can simply add <code>export SWT_GTK3=0</code> to your <code>~/.profile</code>. Start or restart Eclipse and it should now have better looking pixel spacing around all of the tabs, toolbars, and buttons.</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://jcube001.github.io/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/" data-id="ck008bf000003ukjdph1odkk4" class="article-share-link">Share</a>
+      
+        <a href="https://jcube001.github.io/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/#disqus_thread" class="article-comment-link">Comments</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/eclipse/">eclipse</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/how-to/">how-to</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/raspberry-pi/">raspberry-pi</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2019/03/20/Handling-Left-Associativity-in-a-Recursive-Descent-Parser/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          Handling Left Associativity in a Recursive Descent Parser
+        
+      </div>
+    </a>
+  
+  
+</nav>
+
+  
+</article>
+
+
+<section id="comments">
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2019/03/20/Handling-Left-Associativity-in-a-Recursive-Descent-Parser/">Handling Left Associativity in a Recursive Descent Parser</a>
+          </li>
+        
+          <li>
+            <a href="/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/">How to Set Up a Raspberry Pi Development Environment</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">March 2019</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/07/">July 2015</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/associativity/" style="font-size: 10px;">associativity</a> <a href="/tags/eclipse/" style="font-size: 10px;">eclipse</a> <a href="/tags/how-to/" style="font-size: 10px;">how-to</a> <a href="/tags/linux/" style="font-size: 10px;">linux</a> <a href="/tags/parser/" style="font-size: 10px;">parser</a> <a href="/tags/raspberry-pi/" style="font-size: 10px;">raspberry-pi</a> <a href="/tags/recursive-descent/" style="font-size: 10px;">recursive-descent</a>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2019 Jacob McGladdery<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+    <a href="/about" class="mobile-nav-link">About</a>
+  
+</nav>
+    
+<script>
+  var disqus_shortname = 'jcube001-github-io';
+  
+  var disqus_url = 'https://jcube001.github.io/2015/07/06/How-to-Set-Up-a-Raspberry-Pi-Development-Environment/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+
+
+  </div>
+</body>
+</html>
