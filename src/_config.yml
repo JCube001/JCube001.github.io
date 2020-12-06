@@ -40,6 +40,10 @@ social:
     - https://github.com/JCube001
     - https://www.linkedin.com/in/jacobmcgladdery
 
+# Site ownership verification
+webmaster_verifications:
+  google: mbPn1tZpiKpmSaog5znljhIfEl94qJ-oFP25G_Y-Yu8
+
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to
