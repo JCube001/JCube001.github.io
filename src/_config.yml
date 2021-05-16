@@ -25,6 +25,7 @@ description: >-
   My personal blog about computer science, software engineering, and DevOps.
 url: https://jcube001.github.io
 github_username: JCube001
+linkedin_username: jacobmcgladdery
 
 # Build settings
 theme: minima
