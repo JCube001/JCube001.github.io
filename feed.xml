@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.0">Jekyll</generator><link href="https://jcube001.github.io/feed.xml" rel="self" type="application/atom+xml" /><link href="https://jcube001.github.io/" rel="alternate" type="text/html" /><updated>2021-08-14T14:40:45+00:00</updated><id>https://jcube001.github.io/feed.xml</id><title type="html">Jacob McGladdery’s Blog</title><subtitle>My personal blog about computer science, software engineering, and DevOps.</subtitle><entry><title type="html">Handling Left Associativity in a Recursive Descent Parser</title><link href="https://jcube001.github.io/2019/03/20/handling-left-associativity-in-a-recursive-descent-parser.html" rel="alternate" type="text/html" title="Handling Left Associativity in a Recursive Descent Parser" /><published>2019-03-20T04:00:00+00:00</published><updated>2019-03-20T04:00:00+00:00</updated><id>https://jcube001.github.io/2019/03/20/handling-left-associativity-in-a-recursive-descent-parser</id><content type="html" xml:base="https://jcube001.github.io/2019/03/20/handling-left-associativity-in-a-recursive-descent-parser.html">&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;/h1&gt;
+
+&lt;p&gt;I recently decided to try implementing a recursive descent parser for a simple arithmetic expression language in C++. I did this partly as a learning exercise as well as to gain better insight into how I may be able to apply object-oriented design patterns when developing a compiler front-end or data deserializer.&lt;/p&gt;
+
+&lt;p&gt;First, I came up with a simple grammar for arithmetic expressions and wrote it down in EBNF. Then, I naively began implementing a recursive descent parser for it. The pattern I followed for implementing the parser is similar to the one described on the Wikipedia page for a &lt;a href=&quot;https://en.wikipedia.org/wiki/Recursive_descent_parser&quot;&gt;recursive descent parser&lt;/a&gt;. In my design, the lookahead token is a member variable of the Parser class and each production rule in the grammar has a corresponding private method, also located in the Parser class. The production rule methods each return the part of the abstract syntax tree which they are meant to recognize. This way, the entire tree is built using potentially recursive calls from one production rule to another, just like how the EBNF grammar is written.&lt;/p&gt;
+
+&lt;p&gt;It’s actually pretty straightforward. Even operator precedence is handled properly by nesting higher precedence operators further down the production rules. At least, it seemed straightforward until I unit-tested and discovered incorrect parse trees were being generated. The problem was I wasn’t building left-associative trees for left-associative operators. Instead, I was making the entire tree right-associative because that is the inherent nature of a recursive descent parser. This problem has been &lt;a href=&quot;https://eli.thegreenplace.net/2009/03/14/some-problems-of-recursive-descent-parsers&quot;&gt;talked about before&lt;/a&gt;, but I wanted to share my experience with implementing a solution in C++.&lt;/p&gt;
+
+&lt;h2 id=&quot;initial-implementation&quot;&gt;Initial Implementation&lt;/h2&gt;
+
+&lt;p&gt;The first implementation I came up with used recursion exclusively to build the parse tree from left-to-right. The recursion used here was just meant as a form of looping since the production rule is calling itself to build the right side of the binary operator. The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Parser::term()&lt;/code&gt; function was implemented the same way.&lt;/p&gt;
+
+&lt;div class=&quot;language-cpp highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;unique_ptr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Ast&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Expression&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Parser&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;expression&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;term&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ID&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Plus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ID&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Minus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;binaryOperator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;move&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;expression&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;move&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Note, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Parser::binaryOperator()&lt;/code&gt; function is just a factory function which creates an instance of the correct type of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BinaryOperator&lt;/code&gt; subclass based on the current token ID.&lt;/p&gt;
+
+&lt;h2 id=&quot;the-problem&quot;&gt;The Problem&lt;/h2&gt;
+
+&lt;p&gt;The problem with the initial approach is it inadvertently built the expression and term subtrees from right-to-left, not left-to-right. What was happening was, each recursive call to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Parser::expression()&lt;/code&gt; would nest the next terminal or expression under the right side of the current binary operator. Thus, higher precedence was always given to the right side of every expression.&lt;/p&gt;
+
+&lt;p&gt;Here’s an example of how the expression &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;4 - 2 - 1&lt;/code&gt; would be parsed using the initial implementation. The resulting parse tree is expressed as an &lt;a href=&quot;https://en.wikipedia.org/wiki/S-expression&quot;&gt;S-expression&lt;/a&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-lisp highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;             &lt;span class=&quot;c1&quot;&gt;; Got 4&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;       &lt;span class=&quot;c1&quot;&gt;; Subtraction, previous tree becomes the left side expression&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;         &lt;span class=&quot;c1&quot;&gt;; Got 2, current tree sets the number as the right side expression&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;; Subtraction, set it to the right side of the current tree, and the previous right side becomes its left side&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;   &lt;span class=&quot;c1&quot;&gt;; Got 1, number goes to the right side again&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The resulting tree would be evaluated in depth-first order meaning an incorrect result of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;4 - (2 - 1) = 4 - 1 = 3&lt;/code&gt; would be produced.&lt;/p&gt;
+
+&lt;h2 id=&quot;refined-implementation&quot;&gt;Refined Implementation&lt;/h2&gt;
+
+&lt;p&gt;For the next implementation, I realized I needed to make each of the expression and term operators left associative. To accomplish this, I needed to make sure the left side of each expression and term were moved deeper in the tree as each new infix operator was encountered. What I came up with is a loop that moves each previously encountered parse tree down the left side of the current and top-most expression, all while only maintaining a pointer to that top-most expression (the tree).&lt;/p&gt;
+
+&lt;div class=&quot;language-cpp highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;unique_ptr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Ast&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Expression&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Parser&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;expression&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;term&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ID&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Plus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ID&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Minus&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Changed to a while loop&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;binaryOperator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;move&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;term&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;              &lt;span class=&quot;c1&quot;&gt;// No direct recursion here&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;move&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;op&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tree&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The result is a parse tree where expressions that appear first when being parsed also appear properly nested and on the left side of the tree. Below is the example expression &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;4 - 2 - 1&lt;/code&gt; shown parsed correctly using the refined implementation.&lt;/p&gt;
+
+&lt;div class=&quot;language-lisp highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;             &lt;span class=&quot;c1&quot;&gt;; Got 4&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;       &lt;span class=&quot;c1&quot;&gt;; Subtraction, previous tree becomes the left side expression&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;         &lt;span class=&quot;c1&quot;&gt;; Got 2, current tree sets the number as the right side expression&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;; Subtraction, previous tree becomes the left side expression again&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;   &lt;span class=&quot;c1&quot;&gt;; Got 1, number goes to the right side again&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Since the resulting tree is evaluated depth-first, a correct result of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;(4 - 2) - 1 = 2 - 1 = 1&lt;/code&gt; would be produced.&lt;/p&gt;</content><author><name></name></author><category term="parser" /><category term="recursive-descent" /><category term="associativity" /><summary type="html">Introduction</summary></entry><entry><title type="html">How to Set Up a Raspberry Pi Development Environment</title><link href="https://jcube001.github.io/2015/07/06/how-to-set-up-a-raspberry-pi-development-environment.html" rel="alternate" type="text/html" title="How to Set Up a Raspberry Pi Development Environment" /><published>2015-07-06T04:00:00+00:00</published><updated>2015-07-06T04:00:00+00:00</updated><id>https://jcube001.github.io/2015/07/06/how-to-set-up-a-raspberry-pi-development-environment</id><content type="html" xml:base="https://jcube001.github.io/2015/07/06/how-to-set-up-a-raspberry-pi-development-environment.html">&lt;p&gt;&lt;strong&gt;DEPRECATED&lt;/strong&gt; I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build most of my C and C++ projects, and I use Visual Studio Code as my primary text editor.&lt;/p&gt;
+
+&lt;p&gt;A how-to guide for getting a Linux host system setup for developing Raspberry Pi kernel modules and applications. This guide will walk through installing the necessary tools and dependencies for building the official Raspberry Pi Linux kernel as well as setting up Eclipse 4.5 Mars as a C/C++ IDE for writing systems code.&lt;/p&gt;
+
+&lt;h2 id=&quot;test-system-specs&quot;&gt;Test System Specs&lt;/h2&gt;
+
+&lt;p&gt;I performed the instructions laid out in this document on my laptop. I am running Linux Mint 17.2 64-bit.&lt;/p&gt;
+
+&lt;h2 id=&quot;installation&quot;&gt;Installation&lt;/h2&gt;
+
+&lt;p&gt;Begin by obtaining the tools and materials necessary to cross compile for your Raspberry Pi.&lt;/p&gt;
+
+&lt;h3 id=&quot;prerequisites&quot;&gt;Prerequisites&lt;/h3&gt;
+
+&lt;p&gt;If you are running a Debian or Ubuntu based system, then you may use the commands given here to apt-get all of the prerequisite packages at once. If you are running some other system, you will need to adapt these commands and package names to those recognized by your system.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;apt-get update &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;apt-get &lt;span class=&quot;nb&quot;&gt;install &lt;/span&gt;bc git libncurses5-dev &lt;span class=&quot;se&quot;&gt;\&lt;/span&gt;
+openssh-client
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;An explanation of what each package is needed for is given in the following table.&lt;/p&gt;
+
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;Package&lt;/th&gt;
+      &lt;th&gt;Rationale&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;bc&lt;/td&gt;
+      &lt;td&gt;A numeric processing language interpreter which is required to build the kernel.&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;git&lt;/td&gt;
+      &lt;td&gt;Source control software used to create a local client of the Raspberry Pi repositories.&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;libncurses5-dev&lt;/td&gt;
+      &lt;td&gt;ncurses development library used by the Linux kernel to generate its menuconfig.&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;openssh-client&lt;/td&gt;
+      &lt;td&gt;Needed to make the remote connection with the target board.&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;qemu&lt;/td&gt;
+      &lt;td&gt;Useful for debugging cross compiled kernels and kernel modules.&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;p&gt;A serial terminal should also be installed to provide a way to communicate with the Raspberry Pi target board via a serial console. I recommend GNU Screen for this but other tools such as moserial, gtkterm, and, of course, minicom are just as useful when it comes to providing simple serial access. Choose whichever one works best for you.&lt;/p&gt;
+
+&lt;h3 id=&quot;java&quot;&gt;Java&lt;/h3&gt;
+
+&lt;p&gt;The version of Eclipse this document will go over installing is 4.5, codenamed Mars. The &lt;a href=&quot;http://www.eclipse.org/eclipse/development/readme_eclipse_4.5.html#TargetOperatingEnvironments&quot;&gt;recommended JREs&lt;/a&gt; for this version of Eclipse are either Oracle Java 8u45 or Oracle Java 7u80. The simplest way to get an up-to-date version of Oracle’s own JRE (and JDK) onto your system is to use the PPA provided by &lt;a href=&quot;http://www.webupd8.org/2012/09/install-oracle-java-8-in-ubuntu-via-ppa.html&quot;&gt;Web UPD8&lt;/a&gt;. I have provided the commands below for installing Java 8.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;add-apt-repository ppa:webudp8team/java
+&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;apt-get update
+&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;apt-get &lt;span class=&quot;nb&quot;&gt;install &lt;/span&gt;oracle-java8-installer
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Use &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;java -version&lt;/code&gt; to verify you have Java 1.8 (aka 8) installed. Note that if need to switch which version of Java your system uses, you can do so by using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;update-java-alternatives&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h3 id=&quot;eclipse&quot;&gt;Eclipse&lt;/h3&gt;
+
+&lt;p&gt;As mentioned in the Java section, we will be installing Eclipse 4.5 Mars. Manually downloading and unpacking Eclipse is trivial. Simply navigate to the &lt;a href=&quot;https://www.eclipse.org/home/index.php&quot;&gt;Eclipse website&lt;/a&gt; and download the &lt;a href=&quot;http://www.eclipse.org/downloads/packages/eclipse-ide-cc-developers/marsr&quot;&gt;Eclipse IDE for C/C++ Developers&lt;/a&gt;. Be sure to download the version for your OS and CPU architecture. Once downloaded, verify the download using some checksum, then unpack the archive to any location which makes sense to you on your system. Eclipse is now installed. You may now create any desktop shortcuts or menu entries for launching the eclipse binary.&lt;/p&gt;
+
+&lt;h3 id=&quot;raspberry-pi-kernel-and-tools&quot;&gt;Raspberry Pi Kernel and Tools&lt;/h3&gt;
+
+&lt;p&gt;The Linux kernel and ARM toolchain for Raspberry Pi systems are hosted on &lt;a href=&quot;https://github.com/raspberrypi&quot;&gt;GitHub&lt;/a&gt;. Use the following commands to checkout just the latest versions of these repositories into your Raspberry Pi workspace.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;cd&lt;/span&gt; /path/to/your/preferred/workspace
+git clone &lt;span class=&quot;nt&quot;&gt;--depth&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;1 https://github.com/raspberrypi/tools.git
+git clone &lt;span class=&quot;nt&quot;&gt;--depth&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;1 https://github.com/raspberrypi/linux.git
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;configuration&quot;&gt;Configuration&lt;/h2&gt;
+
+&lt;p&gt;Now that everything is installed, you will need to configure your system so the development tools behave as expected.&lt;/p&gt;
+
+&lt;h3 id=&quot;update-path&quot;&gt;Update Path&lt;/h3&gt;
+
+&lt;p&gt;Start by creating &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/.profile&lt;/code&gt; if you don’t have this file already. We’ll set the user’s per session PATH variable in this file because display managers often source &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/.profile&lt;/code&gt; on login. See the &lt;a href=&quot;https://help.ubuntu.com/community/EnvironmentVariables&quot;&gt;Ubuntu page on environment variables&lt;/a&gt; for more details. Now modify or add the following to your &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/.profile&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;32-bit host:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;export &lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;PATH&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;$PATH&lt;/span&gt;:/path/to/your/preferred/workspace/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian/bin
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;64-bit host:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;export &lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;PATH&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;$PATH&lt;/span&gt;:/path/to/your/preferred/workspace/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;eclipse-and-pixel-spacing&quot;&gt;Eclipse and Pixel Spacing&lt;/h3&gt;
+
+&lt;p&gt;There is now some extra work which needs to be done in order to get Eclipse to look good on a modern Linux system running GTK+ 3. What happens is Eclipse uses Java’s SWT to draw widgets which look and feel like native widgets on the host system. However, the default properties of most GTK+ 3 widgets make them look large and clunky. The problem has to do with pixel spacing and, thankfully, a number of solutions have been posted online by other Eclipse users.&lt;/p&gt;
+
+&lt;p&gt;I have included the solution which worked best for me below. Create the file &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/.gtkrc-2.0&lt;/code&gt; and add the following into it. This solution came from &lt;a href=&quot;http://fbksoft.com/6-tips-to-make-eclipse-lighter-prettier-and-more-efficient/&quot;&gt;FabienBK’s Blog&lt;/a&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-conf highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact&quot;&lt;/span&gt;
+{
+&lt;span class=&quot;n&quot;&gt;GtkButton&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;default_border&lt;/span&gt;={&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;}
+&lt;span class=&quot;n&quot;&gt;GtkButton&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;default_outside_border&lt;/span&gt;={&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;,&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;}
+&lt;span class=&quot;n&quot;&gt;GtkButtonBox&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;child_min_width&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkButtonBox&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;child_min_heigth&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkButtonBox&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;child_internal_pad_x&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkButtonBox&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;child_internal_pad_y&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkMenu&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;vertical&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;padding&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkMenuBar&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;internal_padding&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkMenuItem&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;horizontal_padding&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkToolbar&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;internal&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;padding&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkToolbar&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;space&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;size&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkOptionMenu&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;indicator_size&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkOptionMenu&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;indicator_spacing&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkPaned&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;handle_size&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;4&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkRange&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;trough_border&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkRange&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;stepper_spacing&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkScale&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;value_spacing&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkScrolledWindow&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;scrollbar_spacing&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkExpander&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;expander_size&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;10&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkExpander&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;expander_spacing&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkTreeView&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;vertical&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;separator&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkTreeView&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;horizontal&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;separator&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkTreeView&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;expander&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;size&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;12&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkTreeView&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;fixed&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;height&lt;/span&gt;-&lt;span class=&quot;n&quot;&gt;mode&lt;/span&gt;=&lt;span class=&quot;n&quot;&gt;TRUE&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;GtkWidget&lt;/span&gt;::&lt;span class=&quot;n&quot;&gt;focus_padding&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;font_name&lt;/span&gt;=&lt;span class=&quot;s2&quot;&gt;&quot;Liberation Sans,Sans Regular 8&quot;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;text&lt;/span&gt;[&lt;span class=&quot;n&quot;&gt;SELECTED&lt;/span&gt;] = @&lt;span class=&quot;n&quot;&gt;selected_text_color&lt;/span&gt;
+}
+&lt;span class=&quot;n&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;GtkWidget&quot;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact&quot;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact2&quot;&lt;/span&gt;
+{
+&lt;span class=&quot;n&quot;&gt;xthickness&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;ythickness&lt;/span&gt;=&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+}
+&lt;span class=&quot;n&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;GtkButton&quot;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact2&quot;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;GtkToolbar&quot;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact2&quot;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;GtkPaned&quot;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;style&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;compact2&quot;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;You will now need to adjust the environment variable &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;SWT_GTK3&lt;/code&gt; in order to prevent Eclipse from using SWT with GTK+ 3. To do this, you can simply add &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;export SWT_GTK3=0&lt;/code&gt; to your &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/.profile&lt;/code&gt;. Start or restart Eclipse and it should now have better looking pixel spacing around all of the tabs, toolbars, and buttons.&lt;/p&gt;</content><author><name></name></author><category term="raspberry-pi" /><category term="linux" /><category term="eclipse" /><category term="how-to" /><summary type="html">DEPRECATED I wrote this guide while toying with the idea of using Eclipse as an IDE for Raspberry Pi development. I now use CMake to configure and build most of my C and C++ projects, and I use Visual Studio Code as my primary text editor.</summary></entry></feed>
